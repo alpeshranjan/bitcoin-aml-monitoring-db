@@ -1,0 +1,105 @@
+ANLC-752 Course Project -- ETL validation run log
+PostgreSQL 16.14 | source: governance.etl_load_audit, governance.dq_check_result
+
+PROVENANCE
+  All three input files are the authentic Elliptic Data Set as distributed on
+  Kaggle. No synthetic fixtures were used in this run. Every figure below was
+  measured against the full 203,769-transaction / 234,355-edge graph.
+
+
+=== LOAD AUDIT ===
+ id |        source_file        |     target_table     | rows_extracted | rows_loaded | rows_rejected | status  |  sha256_prefix   |                 notes                 
+----+---------------------------+----------------------+----------------+-------------+---------------+---------+------------------+---------------------------------------
+  1 | elliptic_txs_classes.csv  | staging.txs_classes  |         203769 |      203769 |             0 | SUCCESS | 93e2e7b2405c735b | core.transaction received 203769 rows
+  2 | elliptic_txs_edgelist.csv | staging.txs_edgelist |         234355 |      234355 |             0 | SUCCESS | a35053ba68a98e43 | core.tx_flow received 234355 rows
+  3 | elliptic_txs_features.csv | staging.txs_features |         203769 |      203769 |             0 | SUCCESS | fd7f83573443c9e3 | core.tx_feature received 203769 rows
+(3 rows)
+
+
+=== DATA QUALITY RULES ===
+            check_name            |   check_type   | severity |             expected_value             | actual_value | passed 
+----------------------------------+----------------+----------+----------------------------------------+--------------+--------
+ classes_row_count_nonzero        | completeness   | ERROR    | > 0                                    | 203769       | t
+ classes_tx_id_unique             | uniqueness     | ERROR    | 0 duplicate tx_id                      | 0            | t
+ classes_code_in_domain           | domain         | ERROR    | 0 out-of-domain class codes            | 0            | t
+ features_tx_id_unique            | uniqueness     | ERROR    | 0 duplicate tx_id                      | 0            | t
+ features_time_step_in_range      | domain         | ERROR    | all time steps in 1..49                | 0            | t
+ classes_features_tx_id_reconcile | reconciliation | ERROR    | 0 symmetric difference                 | 0            | t
+ edgelist_endpoints_resolve       | referential    | ERROR    | 0 unresolved endpoints                 | 0            | t
+ edgelist_no_self_loops           | domain         | WARN     | 0 self-loops                           | 0            | t
+ features_no_null_values          | completeness   | ERROR    | 0 nulls across all 165 feature columns | 0            | t
+(9 rows)
+
+
+=== LOADED ROW COUNTS ===
+       object       |  rows  
+--------------------+--------
+ core.dim_feature   |    165
+ core.dim_time_step |     49
+ core.transaction   | 203769
+ core.tx_flow       | 234355
+ core.tx_feature    | 203769
+(5 rows)
+
+
+=== CLASS DISTRIBUTION ===
+ class_code | is_labelled |   n    |  pct  
+------------+-------------+--------+-------
+ unknown    | f           | 157205 | 77.15
+ licit      | t           |  42019 | 20.62
+ illicit    | t           |   4545 |  2.23
+(3 rows)
+
+
+=== STORAGE FOOTPRINT ===
+             object              | total_size 
+---------------------------------+------------
+ core.tx_feature                 | 271 MB
+ core.tx_flow                    | 28 MB
+ analytics.mv_illicit_exposure   | 21 MB
+ analytics.mv_tx_degree          | 21 MB
+ core.transaction                | 16 MB
+ core.dim_feature                | 104 kB
+ core.dim_class                  | 48 kB
+ analytics.mv_feature_separation | 40 kB
+ core.dim_time_step              | 32 kB
+(9 rows)
+
+
+=== ANALYSIS LAYER ===
+ split | first_period | last_period | n_labelled | n_illicit | n_licit | pct_illicit 
+-------+--------------+-------------+------------+-----------+---------+-------------
+ train |            1 |          34 |      29894 |      3462 |   26432 |       11.58
+ test  |           35 |          49 |      16670 |      1083 |   15587 |        6.50
+(2 rows)
+
+        predictor        | point_biserial_r | mean_illicit | mean_licit 
+-------------------------+------------------+--------------+------------
+ illicit_neighbour_ratio |           0.4159 |        0.234 |      0.011
+ illicit_neighbours      |           0.2116 |        0.439 |      0.040
+ out_degree              |          -0.0426 |        0.742 |      1.186
+ in_degree               |          -0.0266 |        1.270 |      1.909
+(4 rows)
+
+ effect_size | n_features 
+-------------+------------
+ negligible  |        102
+ small       |         54
+ medium      |          8
+ large       |          1
+(4 rows)
+
+ separation_rank |     column_name      | feature_group | cohens_d | effect_size 
+-----------------+----------------------+---------------+----------+-------------
+               1 | local_feature_53     | local         |  -0.9128 | large
+               2 | local_feature_89     | local         |  -0.7876 | medium
+               3 | local_feature_55     | local         |  -0.7859 | medium
+               4 | local_feature_90     | local         |  -0.7646 | medium
+               5 | aggregate_feature_49 | aggregate     |   0.6590 | medium
+               6 | aggregate_feature_57 | aggregate     |  -0.6422 | medium
+               7 | local_feature_91     | local         |  -0.6371 | medium
+               8 | local_feature_52     | local         |  -0.5876 | medium
+               9 | aggregate_feature_61 | aggregate     |   0.5215 | medium
+              10 | local_feature_54     | local         |  -0.4838 | small
+(10 rows)
+

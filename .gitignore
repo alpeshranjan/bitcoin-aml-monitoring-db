@@ -1,0 +1,17 @@
+# Data — 690 MB, obtained from Kaggle, never committed
+data/
+fixtures/
+*.csv
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
