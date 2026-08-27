@@ -1,4 +1,4 @@
-# ANLC-752 Course Project — Bitcoin AML Monitoring Database
+Bitcoin AML Monitoring Database
 
 Relational database and ETL pipeline for the Elliptic Data Set, supporting identification and monitoring of Bitcoin transaction patterns associated with illicit activity.
 
