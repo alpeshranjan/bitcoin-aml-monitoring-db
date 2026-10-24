@@ -1,4 +1,4 @@
-Bitcoin AML Monitoring Database
+# Bitcoin AML Monitoring Database
 
 Relational database and ETL pipeline for the Elliptic Data Set, supporting identification and monitoring of Bitcoin transaction patterns associated with illicit activity.
 
@@ -106,6 +106,19 @@ drift from what was actually built. The feature table is 165 columns wide and th
 ## Schema
 
 Four schemas, one responsibility each.
+
+```mermaid
+erDiagram
+    DIM_CLASS ||--o{ TRANSACTION : class_id
+    DIM_TIME_STEP ||--o{ TRANSACTION : time_step
+    TRANSACTION ||--|| TX_FEATURE : "tx_id, 1:1"
+    TRANSACTION ||--o{ TX_FLOW : src_tx_id
+    TRANSACTION ||--o{ TX_FLOW : dst_tx_id
+    ETL_LOAD_AUDIT ||--o{ DQ_CHECK_RESULT : load_batch_id
+    ETL_LOAD_AUDIT ||--o{ REJECTED_ROW : load_batch_id
+```
+
+`dim_feature` is the lookup for the 165 obfuscated columns. It has no foreign key into `tx_feature`, because those values are a fixed wide row rather than one row per feature. After `sql/05_partition_by_period.sql`, `transaction`'s key is `(tx_id, time_step)`. `tx_flow`'s foreign keys to `transaction` are not database constraints in that shape. Endpoint integrity is checked at load time by `edgelist_endpoints_resolve`, and the result is written to `governance.dq_check_result`.
 
 **`staging`** — text-typed landing zone, unlogged, truncated after each run. Nothing is cast on the way in, so a malformed value fails a named quality rule that can be reported rather than an implicit cast inside `COPY` that surfaces as an opaque error.
 
@@ -220,6 +233,10 @@ class 3.
 **Incremental refresh.** `analytics.refresh_all()` (49 periods) runs in 4,284 ms;
 `analytics.refresh_period(32)` in 109 ms.
 
+![Alert-layer refresh: 4,284 ms for all 49 periods, 109 ms for one](docs/figures/refresh-benchmark.png)
+
+Same machine as the table above: PostgreSQL 18.4, 203,769 transactions, measured 7 Aug 2026. One period is about 39× faster than rebuilding all 49. The gap versus a perfect 49× is fixed per-call overhead.
+
 ---
 
 ## Course deliverable mapping
@@ -231,7 +248,8 @@ assessment, the required items map as follows.
 |---|---|
 | Data source evaluation | `docs/data_source_summary.md` |
 | Schema, ETL, governance, monitoring layer | `sql/01`–`04`, `etl/etl_load.py`, `validation_run_log.txt` |
-| Milestone presentation | `deck/` |
+| Milestone presentation | `deck/milestone-presentation.pdf`, `deck/milestone-presentation.pptx` |
+| Final summary | `docs/final-summary.pdf` |
 | Fit and evaluate a model | `reports/02_model_evaluation.md`, `etl/fit_and_evaluate.py` |
 | Partition by period | `reports/03_partitioning_and_refresh.md`, `sql/05_partition_by_period.sql` |
 | Incremental refresh strategy | `reports/03_partitioning_and_refresh.md`, `sql/06_incremental_refresh.sql` |
